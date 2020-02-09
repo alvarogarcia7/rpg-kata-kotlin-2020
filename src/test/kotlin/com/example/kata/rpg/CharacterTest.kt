@@ -1,5 +1,6 @@
 package com.example.kata.rpg
 
+import com.example.kata.rpg.Character.Companion.Type.*
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.Test
 
@@ -99,6 +100,28 @@ class CharacterTest {
         assertThat(enemy.health).isEqualTo(enemyHealth - (500 / 2))
     }
 
+    @Test
+    fun `a melee cannot attack a very far enemy`() {
+        val character = Character(type = MELEE)
+        val enemyHealth = 1000
+        val enemy = Character(enemyHealth)
+
+        character.attack(enemy, 500, 5)
+
+        assertThat(enemy.health).isEqualTo(enemyHealth)
+    }
+
+    @Test
+    fun `a ranger cannot attack a very very far enemy`() {
+        val character = Character(type = RANGER)
+        val enemyHealth = 1000
+        val enemy = Character(enemyHealth)
+
+        character.attack(enemy, 500, 25)
+
+        assertThat(enemy.health).isEqualTo(enemyHealth)
+    }
+
 }
 
 class DamageEffectTest {
@@ -106,51 +129,69 @@ class DamageEffectTest {
     fun `damage effect will be reduced`() {
         val damageEffect = damageEffectOf(1, 6, 2)
 
-        assertThat(damageEffect.amount).isEqualTo(1)
+        assertThat(damageEffect.attack).isEqualTo(1)
     }
 
     @Test
     fun `damage effect will stay the same`() {
         val damageEffect = damageEffectOf(1, 1, 2)
 
-        assertThat(damageEffect.amount).isEqualTo(2)
+        assertThat(damageEffect.attack).isEqualTo(2)
     }
 
     @Test
     fun `damage effect will stay the same as long as the level difference is not 5`() {
         val damageEffect = damageEffectOf(1, 5, 2)
 
-        assertThat(damageEffect.amount).isEqualTo(2)
+        assertThat(damageEffect.attack).isEqualTo(2)
     }
 
     @Test
     fun `damage effect will be boosted when the difference in levels (case 1)`() {
         val damageEffect = damageEffectOf(6, 1, 2)
 
-        assertThat(damageEffect.amount).isEqualTo((2 * 1.5).toInt())
+        assertThat(damageEffect.attack).isEqualTo((2 * 1.5).toInt())
     }
 
     @Test
     fun `damage effect will be boosted when the difference in levels (case 2)`() {
         val damageEffect = damageEffectOf(7, 1, 2)
 
-        assertThat(damageEffect.amount).isEqualTo((2 * 1.5).toInt())
+        assertThat(damageEffect.attack).isEqualTo((2 * 1.5).toInt())
     }
 
     @Test
     fun `damage effect will stay the same (case 2)`() {
         val damageEffect = damageEffectOf(4, 1, 2)
 
-        assertThat(damageEffect.amount).isEqualTo(2)
+        assertThat(damageEffect.attack).isEqualTo(2)
     }
 }
 
-class DamageEffect(val amount: Int) {
+class DamageEffect(attack: Int) : AttackModifier(attack)
 
-}
+class RangeEffect(attack: Int) : AttackModifier(attack)
 
-class Character(health: Int = INITIAL_HEALTH, val level: Int = 1) {
+open class AttackModifier(val attack: Int)
+
+class Character(
+    health: Int = INITIAL_HEALTH,
+    val level: Int = 1,
+    val type: Type = MELEE
+) {
     companion object {
+        enum class Type(private val maximumRange: Int) {
+            MELEE(2),
+            RANGER(20);
+
+            fun distanceModifier(currentRange: Int): DistanceModifier {
+                if (currentRange > maximumRange) {
+                    return DistanceModifier.NULLIFY
+                }
+                return DistanceModifier.NONE
+            }
+        }
+
         private val INITIAL_HEALTH = 1000
         private val MAXIMUM_HEALTH = 1000
     }
@@ -170,14 +211,34 @@ class Character(health: Int = INITIAL_HEALTH, val level: Int = 1) {
         health = Math.min(MAXIMUM_HEALTH, health + amount)
     }
 
-    fun attack(enemy: Character, damage: Int) {
+    fun attack(enemy: Character, damage: Int, range: Int = 0) {
         if (enemy == this) return
 
-        enemy.receiveDamage(damageEffectOf(level, enemy.level, damage).amount)
+        val distanceModifier: DistanceModifier = type.distanceModifier(range)
+
+        val damageEffectOf = damageEffectOf(level, enemy.level, damage)
+        val finalAttack = distanceModifier(damageEffectOf)
+        enemy.receiveDamage(finalAttack.attack)
     }
 }
 
-fun damageEffectOf(characterLevel: Int, enemyLevel: Int, damage: Int): DamageEffect = when {
+enum class DistanceModifier {
+    NONE {
+        override fun invoke(attackModifier: AttackModifier): AttackModifier {
+            return attackModifier
+        }
+    },
+    NULLIFY {
+        override fun invoke(attackModifier: AttackModifier): AttackModifier {
+            return RangeEffect(0)
+        }
+
+    };
+
+    abstract operator fun invoke(attackModifier: AttackModifier): AttackModifier
+}
+
+fun damageEffectOf(characterLevel: Int, enemyLevel: Int, damage: Int): AttackModifier = when {
     characterLevel.overpowers(enemyLevel) -> DamageEffect((damage * 1.5).toInt())
     enemyLevel.overpowers(characterLevel) -> DamageEffect(damage / 2)
     else -> DamageEffect(damage)
