@@ -6,9 +6,10 @@ import org.junit.Test
 class CharacterTest {
     @Test
     fun `character has the initial values`() {
-        val character = Character()
+        val initialHealth = 1000
+        val character = Character(initialHealth)
 
-        assertThat(character.health).isEqualTo(1000)
+        assertThat(character.health).isEqualTo(initialHealth)
         assertThat(character.level).isEqualTo(1)
     }
 
@@ -48,31 +49,30 @@ class CharacterTest {
 
     @Test
     fun `character can be healed`() {
-        val character = Character()
+        val character = Character(950)
 
-        character.receiveDamage(50)
         character.heal(100)
 
-        assertThat(character.health).isEqualTo(1000 - 50 + 50)
+        assertThat(character.health).isEqualTo(950 + 50)
     }
 
 
     @Test
     fun `dead character cannot be healed`() {
-        val character = Character()
+        val deadCharacter = Character(0)
 
-        character.receiveDamage(1000)
-        character.heal(200)
+        deadCharacter.heal(200)
 
-        assertThat(character.alive).isFalse()
+        assertThat(deadCharacter.alive).isFalse()
     }
 }
 
-class Character {
-    private val INITIAL_HEALTH = 1000
-    private val MAXIMUM_HEALTH = 1000
+class Character(var health: Int = INITIAL_HEALTH) {
+    companion object {
+        private val INITIAL_HEALTH = 1000
+        private val MAXIMUM_HEALTH = 1000
+    }
 
-    var health: Int = INITIAL_HEALTH
     val level: Int = 1
     val alive: Boolean
         get() = health > 0
