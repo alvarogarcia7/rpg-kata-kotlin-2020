@@ -1,7 +1,6 @@
 package com.example.kata.rpg
 
 import org.assertj.core.api.Assertions.assertThat
-import org.junit.Ignore
 import org.junit.Test
 
 class CharacterTest {
@@ -178,13 +177,10 @@ class Character(health: Int = INITIAL_HEALTH, val level: Int = 1) {
     }
 }
 
-fun damageEffectOf(characterLevel: Int, enemyLevel: Int, damage: Int): DamageEffect {
-    if (characterLevel - enemyLevel >= 5) {
-        return DamageEffect((damage * 1.5).toInt())
-    }
-    if (enemyLevel - characterLevel >= 5) {
-        return DamageEffect(damage / 2)
-    }
-
-    return DamageEffect(damage)
+fun damageEffectOf(characterLevel: Int, enemyLevel: Int, damage: Int): DamageEffect = when {
+    characterLevel.overpowers(enemyLevel) -> DamageEffect((damage * 1.5).toInt())
+    enemyLevel.overpowers(characterLevel) -> DamageEffect(damage / 2)
+    else -> DamageEffect(damage)
 }
+
+private fun Int.overpowers(enemyLevel: Int) = this - enemyLevel >= 5
